@@ -23,9 +23,26 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Scanner;
 
+import java.util.logging.ConsoleHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class RagNaif {
 
+    private static void configureLogger() {
+        System.out.println("Configuring logger");
+        // Configure le logger sous-jacent (java.util.logging)
+        Logger packageLogger = Logger.getLogger("dev.langchain4j");
+        packageLogger.setLevel(Level.FINE); // Ajuster niveau
+        // Ajouter un handler pour la console pour faire afficher les logs
+        ConsoleHandler handler = new ConsoleHandler();
+        handler.setLevel(Level.FINE);
+        packageLogger.addHandler(handler);
+    }
+
     public static void main(String[] args) {
+        configureLogger(); // ✅ Active le logging détaillé
+
 
         System.out.println("=== Phase 1 : Enregistrement des embeddings ===");
 
