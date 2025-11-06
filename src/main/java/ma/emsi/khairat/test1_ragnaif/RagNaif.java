@@ -133,5 +133,5 @@ public class RagNaif {
         String reponse = assistant.chat(question);
         System.out.println("🤖 Réponse du modèle Gemini (avec RAG) :\n" + reponse);
 
-    }
+    } 
 }
