@@ -15,6 +15,9 @@ import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2Embedding
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.store.embedding.EmbeddingMatch;
+import dev.langchain4j.store.embedding.EmbeddingSearchRequest;
+import dev.langchain4j.store.embedding.EmbeddingSearchResult;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 
@@ -107,16 +110,28 @@ public class RagNaif {
                 .contentRetriever(retriever)
                 .build();
 
-        // ❓ 5️⃣ Interaction console (multi-questions)
-        try (Scanner scanner = new Scanner(System.in)) {
-            System.out.println("Posez votre question (ou 'exit' pour quitter) :");
-            while (true) {
-                System.out.print("👤 Vous : ");
-                String question = scanner.nextLine();
-                if (question.equalsIgnoreCase("exit")) break;
-                String reponse = assistant.chat(question);
-                System.out.println("🤖 Gemini : " + reponse);
-            }
+
+        //Retrouver les scores des segments/embeddings
+        System.out.println("Retrouver les scores des segments/embeddings");
+        String question = "Quelle est la signification de RAG ?";  // ou toute autre question
+        Embedding embeddingQuestion = embeddingModel.embed(question).content();
+        // 2. Construire la requête de recherche des éléments pertinents
+        EmbeddingSearchRequest embeddingSearchRequest = EmbeddingSearchRequest.builder()
+                .queryEmbedding(embeddingQuestion)
+                .maxResults(3)
+                .minScore(0.5)
+                .build();
+        // 3. Récupère les embeddings et segments les plus pertinents :
+        EmbeddingSearchResult<TextSegment> embeddingSearchResult = embeddingStore.search(embeddingSearchRequest);
+        // 4. Affiche les segments avec leur score :
+        System.out.println("Segments avec leur score :");
+        for (EmbeddingMatch<TextSegment> match : embeddingSearchResult.matches()) {
+            System.out.println("Segment : " + match.embedded() + " avec le score : " + match.score());
         }
+        // 🔍 Vérification du RAG avec la même question
+        System.out.println("\n=== Vérification : réponse de l'assistant via RAG ===");
+        String reponse = assistant.chat(question);
+        System.out.println("🤖 Réponse du modèle Gemini (avec RAG) :\n" + reponse);
+
     }
 }
