@@ -1,4 +1,4 @@
-package ma.emsi.khairat.test1_ragnaif;
+package ma.emsi.khairat.test1_ragnaif_Et_test2;
 
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentParser;
@@ -24,7 +24,6 @@ import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Scanner;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;

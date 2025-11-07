@@ -44,11 +44,10 @@
             <version>1.8.0-beta15</version>
         </dependency>
 
-        <!-- Easy RAG (si utilisé) — vérifier version stable disponible -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-easy-rag</artifactId>
-            <version>1.8.0-beta15</version>  <!-- à confirmer s’il existe -->
+            <version>1.8.0-beta15</version>
         </dependency>
 
 
@@ -57,6 +56,12 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
             <version>2.0.17</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-web-search-engine-tavily</artifactId>
+            <version>1.8.0-beta15</version>
         </dependency>
 
 

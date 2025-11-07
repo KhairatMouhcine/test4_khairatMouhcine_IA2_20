@@ -1,4 +1,4 @@
-package ma.emsi.khairat.test1_ragnaif;
+package ma.emsi.khairat.test1_ragnaif_Et_test2;
 
 import dev.langchain4j.data.document.Document;
 import dev.langchain4j.data.document.DocumentParser;

@@ -1,56 +1,55 @@
-package ma.emsi.khairat.test4_pasderag;
+package ma.emsi.khairat.test5_ragweb;
 
 import dev.langchain4j.data.document.*;
 import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
 import dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser;
 import dev.langchain4j.data.document.splitter.DocumentSplitters;
 import dev.langchain4j.data.embedding.Embedding;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.model.embedding.onnx.allminilml6v2.AllMiniLmL6V2EmbeddingModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
-import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.rag.content.retriever.ContentRetriever;
-import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
-import dev.langchain4j.rag.query.router.QueryRouter;
 import dev.langchain4j.rag.DefaultRetrievalAugmentor;
 import dev.langchain4j.rag.RetrievalAugmentor;
+import dev.langchain4j.rag.content.retriever.ContentRetriever;
+import dev.langchain4j.rag.content.retriever.EmbeddingStoreContentRetriever;
+import dev.langchain4j.rag.content.retriever.WebSearchContentRetriever;
+import dev.langchain4j.rag.query.router.DefaultQueryRouter;
+import dev.langchain4j.rag.query.router.QueryRouter;
 import dev.langchain4j.service.AiServices;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.store.embedding.EmbeddingStore;
 import dev.langchain4j.store.embedding.inmemory.InMemoryEmbeddingStore;
-import dev.langchain4j.data.segment.TextSegment;
-import dev.langchain4j.rag.query.Query;
+import dev.langchain4j.web.search.tavily.TavilyWebSearchEngine;
 import ma.emsi.khairat.test1_ragnaif_Et_test2.Assistant;
-
 import java.nio.file.*;
 import java.util.*;
-import java.util.Scanner;
+import java.util.logging.*;
 
-public class TestPasDeRag {
-
+public class Test5_RagAvecWeb {
+    private static void configureLogger() {
+        Logger logger = Logger.getLogger("dev.langchain4j");
+        logger.setLevel(Level.FINE);
+        ConsoleHandler handler = new ConsoleHandler();
+        handler.setLevel(Level.FINE);
+        logger.addHandler(handler);
+    }
     public static void main(String[] args) {
-
-        System.out.println("=== Phase 1 : Ingestion du document RAG ===");
-
-        // 1️⃣ Parser + Chargement du PDF
+        configureLogger();
         DocumentParser parser = new ApacheTikaDocumentParser();
         Path path = Paths.get("src/main/resources/rag-2.pdf");
         Document doc = FileSystemDocumentLoader.loadDocument(path, parser);
 
-        // 2️⃣ Split + Embeddings
         var splitter = DocumentSplitters.recursive(300, 30);
         List<TextSegment> segments = splitter.split(doc);
         EmbeddingModel embeddingModel = new AllMiniLmL6V2EmbeddingModel();
         List<Embedding> embeddings = embeddingModel.embedAll(segments).content();
 
-        // 3️⃣ Stockage en mémoire
         EmbeddingStore<TextSegment> store = new InMemoryEmbeddingStore<>();
         store.addAll(embeddings, segments);
-        System.out.println("✅ Ingestion terminée avec " + segments.size() + " segments");
 
-        System.out.println("\n=== Phase 2 : Chat avec routage conditionnel (RAG ou pas) ===");
 
-        // 4️⃣ Modèle Gemini
         String GEMINI_KEY = System.getenv("GEMINI_KEY");
         if (GEMINI_KEY == null) throw new IllegalStateException("❌ GEMINI_KEY manquant !");
         ChatModel model = GoogleAiGeminiChatModel.builder()
@@ -60,50 +59,43 @@ public class TestPasDeRag {
                 .logRequestsAndResponses(true)
                 .build();
 
-        // 5️⃣ ContentRetriever
-        EmbeddingStoreContentRetriever retriever = EmbeddingStoreContentRetriever.builder()
+        // 5️⃣ ContentRetriever local (embeddings)
+        EmbeddingStoreContentRetriever retrieverLocal = EmbeddingStoreContentRetriever.builder()
                 .embeddingStore(store)
                 .embeddingModel(embeddingModel)
                 .maxResults(2)
                 .minScore(0.5)
                 .build();
 
-        // 6️⃣ Création de la classe interne pour éviter le RAG
-        class QueryRouterPourEviterRag implements QueryRouter {
-            @Override
-            public Collection<ContentRetriever> route(Query query) {
-                String question = "Est-ce que la requête '" + query.text()
-                        + "' porte sur le 'RAG' (Retrieval Augmented Generation) ou le 'Fine Tuning' ? "
-                        + "Réponds seulement par 'oui', 'non', ou 'peut-être'.";
-                String reponse = model.chat(question).trim().toLowerCase();
-
-                System.out.println("🧠 Décision du QueryRouter : " + reponse);
-                if (reponse.contains("non")) {
-                    System.out.println("🚫 Pas de RAG utilisé.");
-                    return Collections.emptyList();
-                } else {
-                    System.out.println("✅ RAG activé.");
-                    return List.of(retriever);
-                }
-            }
-        }
-
-        // 7️⃣ Instanciation du QueryRouter personnalisé
-        QueryRouter queryRouter = new QueryRouterPourEviterRag();
-
-        // 8️⃣ Création du RetrievalAugmentor
-        RetrievalAugmentor augmentor = DefaultRetrievalAugmentor.builder()
-                .queryRouter(queryRouter)
+        // 6️⃣ Création du moteur Tavily
+        String TAVILY_KEY = System.getenv("TAVILY_API_KEY");
+        if (TAVILY_KEY == null) throw new IllegalStateException("❌ Variable d'environnement TAVILY_API_KEY manquante !");
+        var tavilyEngine = TavilyWebSearchEngine.builder()
+                .apiKey(TAVILY_KEY)
                 .build();
 
-        // 9️⃣ Création de l’assistant
+        // 7️⃣ ContentRetriever Web
+        ContentRetriever retrieverWeb = WebSearchContentRetriever.builder()
+                .webSearchEngine(tavilyEngine)
+                .maxResults(3)
+                .build();
+
+        // 8️⃣ QueryRouter : combine PDF + Web
+        QueryRouter router = new DefaultQueryRouter(List.of(retrieverLocal, retrieverWeb));
+
+        // 9️⃣ RetrievalAugmentor
+        RetrievalAugmentor augmentor = DefaultRetrievalAugmentor.builder()
+                .queryRouter(router)
+                .build();
+
+        // 🔟 Création de l’assistant
         Assistant assistant = AiServices.builder(Assistant.class)
                 .chatModel(model)
                 .retrievalAugmentor(augmentor)
                 .chatMemory(MessageWindowChatMemory.withMaxMessages(10))
                 .build();
 
-        // 🔟 Interaction console
+        // 1️⃣1️⃣ Interaction console
         try (Scanner scanner = new Scanner(System.in)) {
             while (true) {
                 System.out.print("\n👤 Vous : ");
